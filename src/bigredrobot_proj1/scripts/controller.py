@@ -3,25 +3,26 @@
 ## Template for controller node
 
 import rospy
+from std_msgs.msg import String
 from bigredrobot_proj1.msg import *
 from bigredrobot_proj1.srv import *
 
-def callback(data):
-    print data.states
+def state_update(state):
+    #TODO: allow passing of state between functions. Perhaps use a class with callbacks as member functions which modify instance variables.
+    print state.blocks_over
+    print state.gripper_over
+    print state.gripper_closed
+
+def command_update(command):
+    #TODO: allow passing of state between functions. Perhaps use a class with callbacks as member functions which modify instance variables.
+    print command
 
 def controller():
 
-    # In ROS, nodes are uniquely named. If two nodes with the same
-    # node are launched, the previous one is kicked off. The
-    # anonymous=True flag means that rospy will choose a unique
-    # name for our 'talker' node so that multiple talkers can
-    # run simultaneously.
     rospy.init_node("controller", anonymous=True)
 
-    rospy.Subscriber("state", State, callback)
-
-    # spin() simply keeps python from exiting until this node is stopped
-    #rospy.spin()
+    rospy.Subscriber("state", State, state_update)
+    rospy.Subscriber("command", String, command_update)
 
     rospy.wait_for_service('move_robot')
     rate = rospy.Rate(.5)
