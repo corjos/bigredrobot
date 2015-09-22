@@ -1,0 +1,9 @@
+# Action Constants
+UInt8 ACTION_OPEN_GRIPPER=0
+UInt8 ACTION_CLOSE_GRIPPER=1
+UInt8 ACTION_MOVE_TO=2
+UInt8 ACTION_MOVE_OVER=3
+UInt8 action
+Int8 target
+---
+Bool success
