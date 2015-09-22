@@ -1,8 +1,0 @@
-<launch>
-  <rosparam>
-    num_blocks: 1
-    configuration: "scattered"
-  </rosparam>
-  <node name="robot_interface" pkg="bigredrobot_proj1" type="robot_interface" />
-  <node name="controller" pkg="bigredrobot_proj1" type="controller" />
-</launch>
