@@ -59,6 +59,19 @@ class Controller():
                 else:
                     self.move_robot(3, i-1)
 
+    def control_stack_descending(self):
+        if self.is_stacked_descending():
+            pass
+        elif self.is_stacked_ascending():
+            for i in reversed(range(1, len(self.blocks_over)))
+                self.move_robot(0, 0)
+                self.move_robot(2, i)
+                self.move_robot(1, 0)
+                if i == len(self.blocks_over)
+                    self.move_robot(3, -i)
+                else:
+                    self.move_robot(3, i+1)
+
             
     def control(self):
         #rospy.loginfo(self.command)
