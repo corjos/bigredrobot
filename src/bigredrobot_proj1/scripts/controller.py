@@ -56,9 +56,7 @@ class Controller():
             rospy.loginfo("stacking ascending")
             for i in range(1, len(self.blocks_over)+1):
                 # TODO: check for action failure 
-                self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0) 
-                self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, i)
-                self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0) 
+                grab(i)
                 if i == 1:
                     self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, -1)
                 else:
@@ -71,14 +69,22 @@ class Controller():
         elif self.is_stacked_ascending():
             rospy.loginfo("stacking descending")
             for i in reversed(range(1, len(self.blocks_over)+1)):
-                self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0)
-                self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, i)
-                self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0)
+                grab(i)
                 if i == len(self.blocks_over):
                     self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, -i)
                 else:
                     self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, i+1)
 
+    def control_scatter(self):
+        if self.is_stacked_descending():
+            for i in range(1, len(self.blocks_over) + 1):
+                grab(i)
+
+    def grab(self, blocknum):
+        self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0)
+        self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, i)
+        self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0)
+            
             
     def control(self):
         if self.command == "scatter":
