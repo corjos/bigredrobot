@@ -26,6 +26,7 @@ class Controller():
         rospy.Subscriber("command", String, self.command_update)
 
     def is_stacked_ascending(self):
+        # Can't we just check the current state? wasn't this passed in as a configuration
         if self.blocks_over[0] > 0:
             return False
         for i in range(1,len(self.blocks_over)):
@@ -47,20 +48,23 @@ class Controller():
             pass
         elif self.is_stacked_descending():
             for i in range(1, len(self.blocks_over)+1):
-                # TODO: check for action failure
-                self.move_robot(MoveRobot.ACTION_GRIPPER_OPEN, 0)
-                self.move_robot(MoveRobot.ACTION_MOVE_TO, i)
-                self.move_robot(MoveRobot.ACTION_GRIPPER_CLOSE, 0)
+                # TODO: check for action failure 
+                # TODO: Reference MoveRobot.ACTION_OPEN_GRIPPER instead of hardcoded 0
+                # Didn't like MoveRobot.COMMAND.... not sure why
+                self.move_robot(0, 0) #MoveRobot.ACTION_OPEN_GRIPPER
+                self.move_robot(2, i) #MoveRobot.ACTION_MOVE_TO
+                self.move_robot(1, 0) #MoveRobot.ACTION_CLOSE_GRIPPER
                 if i == 1:
-                    self.move_robot(MoveRobot.ACTION_MOVE_OVER, -1)
+                    self.move_robot(3, -1) #MoveRobot.ACTION_MOVE_OVER
                 else:
-                    self.move_robot(MoveRobot.ACTION_MOVE_OVER, i-1)
+                    self.move_robot(3, i-1)
 
             
     def control(self):
+        #rospy.loginfo(self.command)
         if self.command == "scatter":
             pass
-        elif self.command == "stack_ascending":
+        elif "stack_ascending" in str(self.command):
             self.control_stack_ascending()
         elif self.command == "stack_descending":
             pass
