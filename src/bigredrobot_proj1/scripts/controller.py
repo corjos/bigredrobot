@@ -13,23 +13,28 @@ class Controller():
         rospy.init_node("controller", anonymous=True)
         self.command = None
 
+
     def state_update(self, state):
         self.blocks_over = state.blocks_over
         self.gripper_at = state.gripper_at
         self.gripper_closed = state.gripper_closed
 
+
     def command_update(self, command):
         self.command = command.data
+
 
     def init_subscribers(self):
         rospy.Subscriber("state", State, self.state_update)
         rospy.Subscriber("command", String, self.command_update)
+
 
     def is_scattered(self):
         if all([x <= 0 for x in self.blocks_over]):
             return True
         else:
             return False    
+
 
     def is_stacked_ascending(self):
         #TODO: rewrite everything
@@ -40,6 +45,7 @@ class Controller():
                 return False
         return True
         
+
     def is_stacked_descending(self):
         #TODO: rewrite everything
         if self.blocks_over[-1] > 0:
@@ -49,52 +55,72 @@ class Controller():
                 return False
         return True
 
+
     def control_stack_ascending(self):
         if self.is_stacked_ascending():
             pass
+
         elif self.is_stacked_descending():
             rospy.loginfo("stacking ascending")
             for i in range(1, len(self.blocks_over)+1):
                 # TODO: check for action failure 
-                grab(i)
+                target = i - 1
                 if i == 1:
-                    self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, -1)
-                else:
-                    self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, i-1)
+                    target = -1
+                self.move_to(i, target)
+
+        elif self.is_scattered():
+            for i in range(2, len(self.blocks_over) + 1):
+                self.move_to(i, i - 1)
 
 
     def control_stack_descending(self):
         if self.is_stacked_descending():
             pass
+
         elif self.is_stacked_ascending():
             rospy.loginfo("stacking descending")
             for i in reversed(range(1, len(self.blocks_over)+1)):
-                grab(i)
+                target = i + 1
                 if i == len(self.blocks_over):
-                    self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, -i)
-                else:
-                    self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, i+1)
+                    target = -i
+                self.move_to(i, target)
+
+        elif self.is_scattered():
+            for i in reversed(range(1, len(self.blocks_over))):
+                self.move_to(i, i + 1)
+
 
     def control_scatter(self):
-        if self.is_stacked_descending():
-            for i in range(1, len(self.blocks_over) + 1):
-                grab(i)
+        if self.is_scattered():
+            pass
 
-    def grab(self, blocknum):
+        elif self.is_stacked_descending():
+            for i in range(1, len(self.blocks_over) + 1):
+                self.move_to(i, -i)
+
+        elif self.is_stacked_ascending():
+            for i in reversed(range(1, len(self.blocks_over) + 1)):
+                self.move_to(i, -i)
+
+
+    def move_to(self, blocknum, target):
         self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0)
-        self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, i)
+        self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, blocknum)
         self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0)
+        self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, target)
             
-            
+
     def control(self):
         if self.command == "scatter":
-            pass
+            self.control_scatter()
         elif self.command == "stack_ascending":
             self.control_stack_ascending()
         elif self.command == "stack_descending":
             self.control_stack_descending()
         rospy.loginfo("control completed")
         self.command = None
+
 
     def run(self):
         rospy.wait_for_service('move_robot')
