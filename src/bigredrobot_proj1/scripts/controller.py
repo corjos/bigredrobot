@@ -25,8 +25,14 @@ class Controller():
         rospy.Subscriber("state", State, self.state_update)
         rospy.Subscriber("command", String, self.command_update)
 
+    def is_scattered(self):
+        if all([x <= 0 for x in self.blocks_over]):
+            return True
+        else:
+            return False    
+
     def is_stacked_ascending(self):
-        # Can't we just check the current state? wasn't this passed in as a configuration
+        #TODO: rewrite everything
         if self.blocks_over[0] > 0:
             return False
         for i in range(1,len(self.blocks_over)):
@@ -54,7 +60,7 @@ class Controller():
                 self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, i)
                 self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0) 
                 if i == 1:
-                    self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, -1) #MoveRobot.ACTION_MOVE_OVER
+                    self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, -1)
                 else:
                     self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, i-1)
 
