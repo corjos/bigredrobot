@@ -70,9 +70,16 @@ class Controller():
                     self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, i+1)
 
     def control_scatter(self):
-        if self.is_stacked_descending():
+        if self.is_scattered():
+            pass
+        elif self.is_stacked_descending():
             for i in range(1, len(self.blocks_over) + 1):
-                grab(i)
+                self.grab(i)
+                self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, -i)
+        elif self.is_stacked_ascending():
+            for i in reversed(range(1, len(self.blocks_over) + 1)):
+                self.grab(i)
+                self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, -i)
 
     def grab(self, blocknum):
         self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0)
