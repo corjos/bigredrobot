@@ -51,13 +51,13 @@ class Controller():
                 # TODO: check for action failure 
                 # TODO: Reference MoveRobot.ACTION_OPEN_GRIPPER instead of hardcoded 0
                 # Didn't like MoveRobot.COMMAND.... not sure why
-                self.move_robot(0, 0) #MoveRobot.ACTION_OPEN_GRIPPER
-                self.move_robot(2, i) #MoveRobot.ACTION_MOVE_TO
-                self.move_robot(1, 0) #MoveRobot.ACTION_CLOSE_GRIPPER
+                self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0) 
+                self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, i)
+                self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0) 
                 if i == 1:
-                    self.move_robot(3, -1) #MoveRobot.ACTION_MOVE_OVER
+                    self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, -1) #MoveRobot.ACTION_MOVE_OVER
                 else:
-                    self.move_robot(3, i-1)
+                    self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, i-1)
 
             
     def control(self):
