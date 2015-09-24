@@ -50,9 +50,9 @@ class RobotInterface:
             if self.gripper_closed and self.is_topmost(req.target):
                 self.blocks_over[self.gripper_at-1] = req.target
                 success = True
-        rospy.loginfo("Attempt action=%i on block=%i"%(req.action, req.target))
-        if success:
-            rospy.loginfo("Action successful!")
+        #rospy.loginfo("Attempt action=%i on block=%i"%(req.action, req.target))
+        #if success:
+            #rospy.loginfo("Action successful!")
         return MoveRobotResponse(success)
 
     def init_service(self):

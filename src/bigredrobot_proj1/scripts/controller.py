@@ -19,7 +19,7 @@ class Controller():
         self.gripper_closed = state.gripper_closed
 
     def command_update(self, command):
-        self.command = command
+        self.command = command.data
 
     def init_subscribers(self):
         rospy.Subscriber("state", State, self.state_update)
@@ -47,10 +47,9 @@ class Controller():
         if self.is_stacked_ascending():
             pass
         elif self.is_stacked_descending():
+            rospy.loginfo("stacking ascending")
             for i in range(1, len(self.blocks_over)+1):
                 # TODO: check for action failure 
-                # TODO: Reference MoveRobot.ACTION_OPEN_GRIPPER instead of hardcoded 0
-                # Didn't like MoveRobot.COMMAND.... not sure why
                 self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0) 
                 self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, i)
                 self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0) 
@@ -59,38 +58,44 @@ class Controller():
                 else:
                     self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, i-1)
 
+
     def control_stack_descending(self):
         if self.is_stacked_descending():
             pass
         elif self.is_stacked_ascending():
-            for i in reversed(range(1, len(self.blocks_over)))
-                self.move_robot(0, 0)
-                self.move_robot(2, i)
-                self.move_robot(1, 0)
-                if i == len(self.blocks_over)
-                    self.move_robot(3, -i)
+            rospy.loginfo("stacking descending")
+            for i in reversed(range(1, len(self.blocks_over)+1)):
+                self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0)
+                self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, i)
+                self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0)
+                if i == len(self.blocks_over):
+                    self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, -i)
                 else:
-                    self.move_robot(3, i+1)
+                    self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, i+1)
 
             
     def control(self):
-        #rospy.loginfo(self.command)
         if self.command == "scatter":
             pass
-        elif "stack_ascending" in str(self.command):
+        elif self.command == "stack_ascending":
             self.control_stack_ascending()
         elif self.command == "stack_descending":
-            pass
+            self.control_stack_descending()
+        rospy.loginfo("control completed")
+        self.command = None
 
     def run(self):
         rospy.wait_for_service('move_robot')
         self.move_robot = rospy.ServiceProxy('move_robot', MoveRobot)
-        while not self.command:
-            pass
-        self.control()
+        while not rospy.is_shutdown():                
+            if self.command :
+                self.control()
 
 
 if __name__ == '__main__':
-    c = Controller()
-    c.init_subscribers()
-    c.run()
+    try:
+        c = Controller()
+        c.init_subscribers()
+        c.run()
+    except rospy.ROSInterruptException:
+        pass
