@@ -18,6 +18,7 @@ class Controller():
         self.blocks_over = state.blocks_over
         self.gripper_at = state.gripper_at
         self.gripper_closed = state.gripper_closed
+        self.num_arms = state.num_arms
 
 
     def command_update(self, command):
@@ -59,16 +60,13 @@ class Controller():
     def control_stack_ascending(self):
         if self.is_stacked_ascending():
             pass
-
         elif self.is_stacked_descending():
             rospy.loginfo("stacking ascending")
             for i in range(1, len(self.blocks_over)+1):
-                # TODO: check for action failure 
                 target = i - 1
                 if i == 1:
                     target = -1
                 self.move_to(i, target)
-
         elif self.is_scattered():
             for i in range(2, len(self.blocks_over) + 1):
                 self.move_to(i, i - 1)
@@ -105,11 +103,24 @@ class Controller():
 
 
     def move_to(self, blocknum, target):
-        self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0)
+        self.bimanual_move_to(-5, -5, blocknum, target)
+        # TODO: check for action failure 
+        '''self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0)
         self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, blocknum)
-        self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0)
-        self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, target)
+        self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0)       
+        self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, target)'''
             
+    def bimanual_move_to(self, lblocknum, ltarget, rblocknum, rtarget):
+        actions = [MoveRobotRequest.ACTION_OPEN_GRIPPER, MoveRobotRequest.ACTION_MOVE_TO,
+                    MoveRobotRequest.ACTION_CLOSE_GRIPPER, MoveRobotRequest.ACTION_MOVE_OVER]
+        targets = [[0,0], [lblocknum, rblocknum], [0,0], [ltarget, rtarget]]
+        for action, target in zip(actions,targets):
+            req = MoveRobotRequest()
+            for arm in [MoveRobotRequest.LEFT_ARM, MoveRobotRequest.RIGHT_ARM]:
+                req.action[arm] = action
+                req.target[arm] = target[arm]
+            #rospy.loginfo(req)
+            self.move_robot(req)
 
     def control(self):
         if self.command == "scatter":
