@@ -66,10 +66,10 @@ class Controller():
                 target = i - 1
                 if i == 1:
                     target = -1
-                self.move_to_right(i, target)
+                self.move_right(i, target)
         elif self.is_scattered():
             for i in range(2, len(self.blocks_over) + 1):
-                self.move_to_right(i, i - 1)
+                self.move_right(i, i - 1)
 
 
     def control_stack_descending(self):
@@ -82,11 +82,11 @@ class Controller():
                 target = i + 1
                 if i == len(self.blocks_over):
                     target = -i
-                self.move_to_right(i, target)
+                self.move_right(i, target)
 
         elif self.is_scattered():
             for i in reversed(range(1, len(self.blocks_over))):
-                self.move_to_right(i, i + 1)
+                self.move_right(i, i + 1)
 
 
     def control_scatter(self):
@@ -95,11 +95,11 @@ class Controller():
 
         elif self.is_stacked_descending():
             for i in range(1, len(self.blocks_over) + 1):
-                self.move_to_right(i, -i)
+                self.move_right(i, -i)
 
         elif self.is_stacked_ascending():
             for i in reversed(range(1, len(self.blocks_over) + 1)):
-                self.move_to_right(i, -i)
+                self.move_right(i, -i)
 
 
     def control_odd_even(self):
@@ -115,39 +115,45 @@ class Controller():
                 split_stack(i)
 
         elif self.is_scattered():
+            pass            
             #TODO
 
 
     def split_stack(self, currentblock):
         if currentblock % 2 == 1:
-            self.move_to_left(currentblock, top_left)
+            self.move_left(currentblock, top_left)
             top_left = currentblock
         else:
-            self.move_to_right(currentblock, top_right)
+            self.move_right(currentblock, top_right)
             top_right = currentblock
 
 
-    def move_to_left(self, blocknum, target):
-        self.bimanual_move_to(blocknum, target, -5, -5)
+    def move_left(self, blocknum, target):
+        self.bimanual_move(blocknum, target, None, None)
 
-    def move_to_right(self, blocknum, target):
-        self.bimanual_move_to(-5, -5, blocknum, target)
+    def move_right(self, blocknum, target):
+        self.bimanual_move(None, None, blocknum, target)
         # TODO: check for action failure 
         '''self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0)
         self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, blocknum)
         self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0)       
         self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, target)'''
             
-    def bimanual_move_to(self, lblocknum, ltarget, rblocknum, rtarget):
+    def bimanual_move(self, lblocknum, ltarget, rblocknum, rtarget):
+        # Execute open->move_to->close->move_over sequence in both arms, simultaneously moving blocks lblocknum and rblocknum on top of ltarget and rtarget, respectively. When block and target values are both None the respective arm will be idle.
         actions = [MoveRobotRequest.ACTION_OPEN_GRIPPER, MoveRobotRequest.ACTION_MOVE_TO,
                     MoveRobotRequest.ACTION_CLOSE_GRIPPER, MoveRobotRequest.ACTION_MOVE_OVER]
         targets = [[0,0], [lblocknum, rblocknum], [0,0], [ltarget, rtarget]]
         for action, target in zip(actions,targets):
             req = MoveRobotRequest()
-            for arm in [MoveRobotRequest.LEFT_ARM, MoveRobotRequest.RIGHT_ARM]:
-                req.action[arm] = action
-                req.target[arm] = target[arm]
-            #rospy.loginfo(req)
+            for arm in [MoveRobotRequest.LEFT_ARM, MoveRobotRequest.RIGHT_ARM]:               
+                if target[arm] is None:
+                    req.action[arm] = MoveRobotRequest.ACTION_IDLE
+                    req.target[arm] = 0
+                else:                
+                    req.action[arm] = action
+                    req.target[arm] = target[arm]
+            rospy.loginfo(req)
             self.move_robot(req)
 
     def control(self):
@@ -158,8 +164,7 @@ class Controller():
         elif self.command == "stack_descending":
             self.control_stack_descending()
         else:
-            raise ValueError('You suck at typing')
-        rospy.loginfo("control completed")
+            rospy.logwarn('You suck at typing, try again.')
         self.command = None
 
 

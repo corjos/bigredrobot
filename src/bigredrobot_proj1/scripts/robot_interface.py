@@ -43,52 +43,41 @@ class RobotInterface:
 
     # Callback function for move_robot server
     def handle_move_robot(self, req):
-        #TODO: action handling, incorporating conditions for each action and world state     
-        # If we are only using one arm. We are using right        
-        success = False
         if self.num_arms == 1:
-            rospy.loginfo("RIGHT ARM")
-            if req.action[State.RIGHT_ARM]==req.ACTION_OPEN_GRIPPER:
-                if self.gripper_closed[State.RIGHT_ARM]:
-                    self.gripper_closed[State.RIGHT_ARM] = False
-                    success = True
-            elif req.action[State.RIGHT_ARM]==req.ACTION_CLOSE_GRIPPER:
-                if not self.gripper_closed[State.RIGHT_ARM]:
-                    self.gripper_closed[State.RIGHT_ARM] = True
-                    success = True
-            elif req.action[State.RIGHT_ARM]==req.ACTION_MOVE_TO:
-                if not self.gripper_closed[State.RIGHT_ARM] and self.is_topmost(req.target[State.RIGHT_ARM]):
-                    self.gripper_at[State.RIGHT_ARM] = req.target[State.RIGHT_ARM]
-                    success = True
-            elif req.action[State.RIGHT_ARM]==req.ACTION_MOVE_OVER:
-                if self.gripper_closed[State.RIGHT_ARM] and self.is_topmost(req.target[State.RIGHT_ARM]):
-                    self.blocks_over[self.gripper_at[State.RIGHT_ARM]-1] = req.target[State.RIGHT_ARM]
-                    success = True
-        else: #This is a lot of duplicated code. I originally tried putting a break statement in this for loop
-              #that checked if we were only using one arm so we would ignore the left arm, but I was getting
-              #weird behavior. Need to look into this more. 
-            rospy.loginfo("Both ARMs")
-            for arm in [State.LEFT_ARM, State.RIGHT_ARM]:
-                if req.action[arm]==req.ACTION_OPEN_GRIPPER:
-                    if self.gripper_closed[arm]:
-                        self.gripper_closed[arm] = False
-                        success = True
-                elif req.action[arm]==req.ACTION_CLOSE_GRIPPER:
-                    if not self.gripper_closed[arm]:
-                        self.gripper_closed[arm] = True
-                        success = True
-                elif req.action[arm]==req.ACTION_MOVE_TO:
-                    if not self.gripper_closed[arm] and self.is_topmost(req.target[arm]):
+            arms = [State.RIGHT_ARM] # If we are only using one arm. We are using right        
+        elif self.num_arms == 2:
+            arms = [State.LEFT_ARM, State.RIGHT_ARM]
+        else:
+            raise ValueError('Wrong number of arms')
+        
+        for arm in arms:
+            if req.action[arm]==req.ACTION_OPEN_GRIPPER:
+                if self.gripper_closed[arm]:
+                    self.gripper_closed[arm] = False
+                else:
+                    raise ValueError('Invalid action OPEN_GRIPPER (arm = %i)' %(arm))
+            elif req.action[arm]==req.ACTION_CLOSE_GRIPPER:
+                if not self.gripper_closed[arm]:
+                    self.gripper_closed[arm] = True
+                else:
+                    raise ValueError('Invalid action CLOSE_GRIPPER(arm = %i)' %(arm))
+            elif req.action[arm]==req.ACTION_MOVE_TO:
+                if not self.gripper_closed[arm]:
+                    if req.target[arm] > 0 and self.is_topmost(req.target[arm]): # Block is real                    
                         self.gripper_at[arm] = req.target[arm]
-                        success = True
-                elif req.action[arm]==req.ACTION_MOVE_OVER:
-                    if self.gripper_closed[arm] and self.is_topmost(req.target[arm]):
-                        self.blocks_over[self.gripper_at[arm]-1] = req.target[arm]
-                        success = True
-            
-        #rospy.loginfo("Attempt action=%i on block=%i"%(req.action, req.target))
-        #if success:
-            #rospy.loginfo("Action successful!")
+                    else: # Explicitly handle trying to move to phantom block by leaving state unchanged
+                        # TODO: Think of a better way to deal with this
+                        rospy.logwarn('Ignored invalid MOVE_TO action and left state unchanged')
+                else:
+                    raise ValueError('Invalid action MOVE_TO (arm = %i, target = %i)' %(arm, req.target[arm]))
+            elif req.action[arm]==req.ACTION_MOVE_OVER:
+                if self.gripper_closed[arm] and self.is_topmost(req.target[arm]):
+                    self.blocks_over[self.gripper_at[arm]-1] = req.target[arm]
+                else:
+                    raise ValueError('Invalid action MOVE_OVER (arm = %i, target = %i)' %(arm, req.target[arm]))
+            elif req.action[arm]==req.ACTION_IDLE:
+                pass # nothing to see here
+        success = True # More useful on the real robot? Controller should never request symbolically invalid actions, so a ValueError will be used for that case.
         return MoveRobotResponse(success)
 
     def init_service(self):
