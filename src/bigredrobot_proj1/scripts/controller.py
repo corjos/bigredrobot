@@ -102,30 +102,31 @@ class Controller():
                 self.move_right(i, -i)
 
 
-    def control_odd_even(self):
+    def control_stack_odd_even(self):
         #For now, stack in any order, but create two separate odd/even stacks
-        top_left = -1
+        top_left = -1 # Top block in left stack
         top_right = -2
         if self.is_stacked_descending():
             for i in range(1, len(self.blocks_over) + 1):
-                split_stack(i)
+                top_left, top_right = self.split_stack(i, top_left, top_right)
 
         elif self.is_stacked_ascending():
             for i in reversed(range(1, len(self.blocks_over) + 1)):
-                split_stack(i)
+                top_left, top_right = self.split_stack(i, top_left, top_right)
 
         elif self.is_scattered():
-            pass            
-            #TODO
+            pass
 
-
-    def split_stack(self, currentblock):
+    def split_stack(self, currentblock, top_left, top_right):
+        # move a given block on top of block top_left if it is odd, or top right if it is even
+        # return the topmost block in the left and right stacks
         if currentblock % 2 == 1:
             self.move_left(currentblock, top_left)
             top_left = currentblock
         else:
             self.move_right(currentblock, top_right)
             top_right = currentblock
+        return top_left, top_right
 
 
     def move_left(self, blocknum, target):
@@ -163,8 +164,13 @@ class Controller():
             self.control_stack_ascending()
         elif self.command == "stack_descending":
             self.control_stack_descending()
+        elif self.command == "stack_odd_even":
+            if self.num_arms == 2:
+                self.control_stack_odd_even()
+            else:
+                rospy.logwarn('odd_even only available in bimanual mode, try again')
         else:
-            rospy.logwarn('You suck at typing, try again.')
+            rospy.logwarn('You suck at typing. invalid name, try again.')
         self.command = None
 
 

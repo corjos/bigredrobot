@@ -15,6 +15,8 @@ class RobotInterface:
         num_blocks = rospy.get_param('num_blocks')
         configuration = rospy.get_param('configuration')
         self.num_arms = rospy.get_param('num_arms')
+        
+        
 
         self.gripper_at = [None]*2
         self.gripper_closed = [None]*2
@@ -24,16 +26,16 @@ class RobotInterface:
         if configuration=='scattered':
             # Not implemented fully
             self.blocks_over = list(range(-num_blocks+1,1)) # e.g [-2, -1, 0]
-            self.gripper_at[State.LEFT_ARM] = -1
+            self.gripper_at[State.LEFT_ARM] = -1 # Not technically correct TODO: sort out these conventions
             self.gripper_at[State.RIGHT_ARM] = 0
         elif configuration=='stacked_ascending':
             self.blocks_over = list(range(num_blocks)) # e.g [0, 1, 2]
-            self.gripper_at[State.LEFT_ARM] = -1
+            self.gripper_at[State.LEFT_ARM] = -1 # Not technically correct TODO: sort out these conventions
             self.gripper_at[State.RIGHT_ARM] = num_blocks
         elif configuration=='stacked_descending':
             self.blocks_over = list(range(2,num_blocks+1)) # e.g [2, 3, 0]
             self.blocks_over.append(0)
-            self.gripper_at[State.LEFT_ARM] = -1
+            self.gripper_at[State.LEFT_ARM] = -1 # Not technically correct TODO: sort out these conventions
             self.gripper_at[State.RIGHT_ARM] = 1
             self.gripper_closed[State.LEFT_ARM] = True   
             self.gripper_closed[State.RIGHT_ARM] = True     
@@ -62,12 +64,8 @@ class RobotInterface:
                 else:
                     raise ValueError('Invalid action CLOSE_GRIPPER(arm = %i)' %(arm))
             elif req.action[arm]==req.ACTION_MOVE_TO:
-                if not self.gripper_closed[arm]:
-                    if req.target[arm] > 0 and self.is_topmost(req.target[arm]): # Block is real                    
+                if not self.gripper_closed[arm] and self.is_topmost(req.target[arm]):                    
                         self.gripper_at[arm] = req.target[arm]
-                    else: # Explicitly handle trying to move to phantom block by leaving state unchanged
-                        # TODO: Think of a better way to deal with this
-                        rospy.logwarn('Ignored invalid MOVE_TO action and left state unchanged')
                 else:
                     raise ValueError('Invalid action MOVE_TO (arm = %i, target = %i)' %(arm, req.target[arm]))
             elif req.action[arm]==req.ACTION_MOVE_OVER:
@@ -77,6 +75,9 @@ class RobotInterface:
                     raise ValueError('Invalid action MOVE_OVER (arm = %i, target = %i)' %(arm, req.target[arm]))
             elif req.action[arm]==req.ACTION_IDLE:
                 pass # nothing to see here
+
+        # TODO: add joint motion constraints/checks
+
         success = True # More useful on the real robot? Controller should never request symbolically invalid actions, so a ValueError will be used for that case.
         return MoveRobotResponse(success)
 
@@ -100,6 +101,8 @@ class RobotInterface:
         else:
             return False
 
+    def baxter_move(source, dest):
+        
 
 if __name__ == '__main__':
     try:
