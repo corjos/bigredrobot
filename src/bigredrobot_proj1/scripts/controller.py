@@ -57,49 +57,47 @@ class Controller():
         return True
 
 
+    def make_available(self, target):
+        rospy.logwarn('Make %i available, States: %s' %(target, str(self.blocks_over)))
+        #Do the following if the target isn't available yet
+        if not self.is_available(target):
+            blockOnTop = self.blocks_over.index(target) + 1 #Correct for zero index
+            rospy.loginfo('%i is on top of %i' %(blockOnTop,target))
+            if not self.is_available(blockOnTop):
+                self.make_available(blockOnTop)
+            rospy.loginfo('Moving %i to %i' %(blockOnTop, -blockOnTop))
+            self.move_left(blockOnTop, -blockOnTop)
+        else:
+            rospy.loginfo('Block %i is available, States: %s' %(target, str(self.blocks_over)))
+        
+
+    def is_available(self, target):
+        return target not in self.blocks_over
+
+
     def control_stack_ascending(self):
-        if self.is_stacked_ascending():
-            pass
-        elif self.is_stacked_descending():
-            rospy.loginfo("stacking ascending")
-            for i in range(1, len(self.blocks_over)+1):
-                target = i - 1
-                if i == 1:
-                    target = -1
-                self.move_right(i, target)
-        elif self.is_scattered():
-            for i in range(2, len(self.blocks_over) + 1):
-                self.move_right(i, i - 1)
+        self.make_available(1)
+        self.make_available(2)
+        self.make_available(3)
+       
+        #for i in range(1, len(self.blocks_over) + 1):
+            #self.make_available(i)
+            #destination = -i if i == 1 else i - 1
+            #self.move(i, destination)
 
 
     def control_stack_descending(self):
-        if self.is_stacked_descending():
-            pass
-
-        elif self.is_stacked_ascending():
-            rospy.loginfo("stacking descending")
-            for i in reversed(range(1, len(self.blocks_over)+1)):
-                target = i + 1
-                if i == len(self.blocks_over):
-                    target = -i
-                self.move_right(i, target)
-
-        elif self.is_scattered():
-            for i in reversed(range(1, len(self.blocks_over))):
-                self.move_right(i, i + 1)
+        for i in reversed(range(1, len(self.blocks_over) + 1)):
+            self.make_available(i)
+            destination = -i if i == 1 else i - 1
+            self.move(i, destination)
 
 
     def control_scatter(self):
-        if self.is_scattered():
-            pass
-
-        elif self.is_stacked_descending():
-            for i in range(1, len(self.blocks_over) + 1):
-                self.move_right(i, -i)
-
-        elif self.is_stacked_ascending():
-            for i in reversed(range(1, len(self.blocks_over) + 1)):
-                self.move_right(i, -i)
+        for i in range(len(self.blocks_over)):
+            self.make_available(self.blocks_over[i])
+            destination = -self.blocks_over[i]
+            self.move(self.blocks_over[i], destination)
 
 
     def control_stack_odd_even(self):
@@ -128,6 +126,20 @@ class Controller():
             top_right = currentblock
         return top_left, top_right
 
+    
+    #I don't know if we need this anymore...
+    def get_base_block(self, blocknum):
+        currentBlock = blocknum
+        while currentBlock > 0:
+            currentBlock = self.blocks_over[currentBlock - 1]
+        return currentBlock
+
+
+    def move(self, blocknum, target):
+        if blocknum % 2 == 1:
+            self.move_left(blocknum, target)
+        else:
+            self.move_right(blocknum, target)
 
     def move_left(self, blocknum, target):
         self.bimanual_move(blocknum, target, None, None)
@@ -135,10 +147,6 @@ class Controller():
     def move_right(self, blocknum, target):
         self.bimanual_move(None, None, blocknum, target)
         # TODO: check for action failure 
-        '''self.move_robot(MoveRobotRequest.ACTION_OPEN_GRIPPER, 0)
-        self.move_robot(MoveRobotRequest.ACTION_MOVE_TO, blocknum)
-        self.move_robot(MoveRobotRequest.ACTION_CLOSE_GRIPPER, 0)       
-        self.move_robot(MoveRobotRequest.ACTION_MOVE_OVER, target)'''
             
     def bimanual_move(self, lblocknum, ltarget, rblocknum, rtarget):
         # Execute open->move_to->close->move_over sequence in both arms, simultaneously moving blocks lblocknum and rblocknum on top of ltarget and rtarget, respectively. When block and target values are both None the respective arm will be idle.
@@ -154,7 +162,7 @@ class Controller():
                 else:                
                     req.action[arm] = action
                     req.target[arm] = target[arm]
-            rospy.loginfo(req)
+            #rospy.loginfo(req)
             self.move_robot(req)
 
     def control(self):

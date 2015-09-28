@@ -30,11 +30,12 @@ class RobotInterface:
             self.gripper_at[State.RIGHT_ARM] = 0
         elif configuration=='stacked_ascending':
             self.blocks_over = list(range(num_blocks)) # e.g [0, 1, 2]
+            self.blocks_over[0] = -1
             self.gripper_at[State.LEFT_ARM] = -1 # Not technically correct TODO: sort out these conventions
             self.gripper_at[State.RIGHT_ARM] = num_blocks
         elif configuration=='stacked_descending':
             self.blocks_over = list(range(2,num_blocks+1)) # e.g [2, 3, 0]
-            self.blocks_over.append(0)
+            self.blocks_over.append(-5)
             self.gripper_at[State.LEFT_ARM] = -1 # Not technically correct TODO: sort out these conventions
             self.gripper_at[State.RIGHT_ARM] = 1
             self.gripper_closed[State.LEFT_ARM] = True   
@@ -64,6 +65,7 @@ class RobotInterface:
                 else:
                     raise ValueError('Invalid action CLOSE_GRIPPER(arm = %i)' %(arm))
             elif req.action[arm]==req.ACTION_MOVE_TO:
+                    
                 if not self.gripper_closed[arm] and self.is_topmost(req.target[arm]):                    
                         self.gripper_at[arm] = req.target[arm]
                 else:
@@ -102,6 +104,7 @@ class RobotInterface:
             return False
 
     def baxter_move(source, dest):
+        pass
         
 
 if __name__ == '__main__':
