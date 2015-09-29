@@ -4,6 +4,9 @@
 
 import rospy
 import baxter_interface
+import logging
+LOG_FILENAME = "/home/cs4752/Documents/bigredrobot/debug.log"
+
 
 from std_msgs.msg import String
 from bigredrobot_proj1.msg import *
@@ -27,14 +30,23 @@ from baxter_core_msgs.srv import (
 class Controller():
     
     def __init__(self):
+        logging.debug("Testing")
+        logging.debug("Another line")
         rospy.init_node("controller", anonymous=True)
         self.command = None
         #Baxter enable
         #baxter_interface.RobotEnable().enable()
         #Baxter Init right arm
+
         #self.right_limb = baxter_interface.Limb('right')
 		
 
+        self.right_limb = baxter_interface.Limb('right')
+
+
+        self.right_gripper = baxter_interface.Gripper('right')
+        self.right_gripper.calibrate()
+        
 
     def state_update(self, state):
         self.blocks_over = state.blocks_over
@@ -189,11 +201,20 @@ class Controller():
         while not self.state_updated:
             pass
 
-    def move_arm(self):
-        angles = self.right_limb.joint_angles()
+    def move_arm(self, command_in):
+        logging.debug("I think I'll move")
+        #x - 2
+        #y - 3
+        #z - 4
+        coordinates = command_in.split('_')
+        rospy.loginfo(coordinates)
+
+        '''angles = self.right_limb.joint_angles()
         self.right_limb.move_to_joint_positions(angles)
         self.right_limb.move_to_neutral()
-        #self.right_limb.move_to_joint_positions(angles)
+        neutral_angles = self.right_limb.joint_angles()
+        logging.debug(neutral_angles)
+        self.right_limb.move_to_joint_positions(angles)'''
 
 
         #Development code --- not pretty at all sorry
@@ -204,28 +225,57 @@ class Controller():
         orient = pose.popitem()
         prev = pos[1]
 
-        loc = Point(0,0,0)
+        loc = Point(float(coordinates[2]),float(coordinates[3]),float(coordinates[4]))
 
         hdr = Header(stamp=rospy.Time.now(), frame_id='base')
-        poses = {
+        '''poses = {
             'right': PoseStamped(header=hdr,
-                pose=Pose(position=loc, orientation=orient[1]))}
+                pose=Pose(position=loc, orientation=orient[1]))}'''
+
+        poses = { #z -.08 is the table BLOCKS are roughly .05
+                'right': PoseStamped(header=hdr,
+                    pose=Pose(position=loc, orientation=Quaternion(
+                            x=0.74,
+                            y=0.67,
+                            z=0.027,
+                            w=0.025)
+                    )
+                )
+        }
                 
         ikreq.pose_stamp.append(poses['right'])
 
         #def ik_solve(limb, pos, orient):
         resp = self.ik_solve(ikreq)
         
-        if resp.isValid[0]:
-          rospy.loginfo("Nothin found here...")
-
+        if not resp.isValid[0]:
+            rospy.loginfo("Nothin found here...")
+        else:
+            rospy.loginfo("VALID IK")
+        rospy.loginfo(resp)
         limb_joints = dict(zip(resp.joints[0].name, resp.joints[0].position))
+        rospy.loginfo(limb_joints)
        
         self.right_limb.move_to_joint_positions(limb_joints)
+
+    def move_neutral(self):
+        self.right_limb.move_to_neutral()
+        pose = self.right_limb.endpoint_pose()
+        rospy.loginfo(pose)
+
+    def open_gripper(self):
+        self.right_gripper.open()
+    
+    def close_gripper(self):
+        self.right_gripper.close()
+
+    def get_pose(self):
+        rospy.loginfo(self.right_limb.endpoint_pose())
         
 
 
     def control(self):
+        logging.debug("I got a command")
         if self.command == "scatter":
             self.control_scatter()
         elif self.command == "stack_ascending":
@@ -237,14 +287,24 @@ class Controller():
                 self.control_stack_odd_even()
             else:
                 rospy.logwarn('odd_even only available in bimanual mode, try again')
-        elif self.command == "move_arm":
-			self.move_arm();
+        elif "move_arm" in self.command:
+            logging.debug("I should move my arm")
+            self.move_arm(self.command)
+        elif self.command == "move_neutral":
+            self.move_neutral()
+        elif self.command == "open_gripper":
+                    self.open_gripper()
+        elif self.command == "close_gripper":
+                    self.close_gripper()
+        elif self.command == "pose":
+                    self.get_pose()
         else:
             rospy.logwarn('You suck at typing. invalid name, try again.')
         self.command = None
 
 
     def run(self):
+        self.pub = rospy.Publisher('debug_out', String, queue_size=10)
         rospy.wait_for_service('move_robot')
         self.move_robot = rospy.ServiceProxy('move_robot', MoveRobot)
 
