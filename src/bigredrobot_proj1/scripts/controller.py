@@ -30,9 +30,9 @@ class Controller():
         rospy.init_node("controller", anonymous=True)
         self.command = None
         #Baxter enable
-        baxter_interface.RobotEnable().enable()
+        #baxter_interface.RobotEnable().enable()
         #Baxter Init right arm
-        self.right_limb = baxter_interface.Limb('right')
+        #self.right_limb = baxter_interface.Limb('right')
 		
 
 
@@ -41,6 +41,7 @@ class Controller():
         self.gripper_at = state.gripper_at
         self.gripper_closed = state.gripper_closed
         self.num_arms = state.num_arms
+        self.state_updated = True
 
 
     def command_update(self, command):
@@ -86,6 +87,7 @@ class Controller():
             blockOnTop = self.blocks_over.index(target) + 1 #Correct for zero index
             rospy.loginfo('%i is on top of %i' %(blockOnTop,target))
             if not self.is_available(blockOnTop):
+                rospy.loginfo('%i is not available' %(blockOnTop))
                 self.make_available(blockOnTop)
             rospy.loginfo('Moving %i to %i' %(blockOnTop, -blockOnTop))
             self.move_left(blockOnTop, -blockOnTop)
@@ -94,32 +96,29 @@ class Controller():
         
 
     def is_available(self, target):
-        return target not in self.blocks_over
+        if target not in self.blocks_over:
+            return True
+        else:
+            return False
 
 
-    def control_stack_ascending(self):
-        self.make_available(1)
-        self.make_available(2)
-        self.make_available(3)
-       
-        #for i in range(1, len(self.blocks_over) + 1):
-            #self.make_available(i)
-            #destination = -i if i == 1 else i - 1
-            #self.move(i, destination)
-
-
-    def control_stack_descending(self):
-        for i in reversed(range(1, len(self.blocks_over) + 1)):
+    def control_stack_ascending(self):    
+        for i in range(1, len(self.blocks_over) + 1):
             self.make_available(i)
             destination = -i if i == 1 else i - 1
             self.move(i, destination)
 
 
+    def control_stack_descending(self):
+        for i in reversed(range(1, len(self.blocks_over) + 1)):
+            self.make_available(i)
+            destination = -i if i == len(self.blocks_over) else i + 1
+            self.move(i, destination)
+
+
     def control_scatter(self):
         for i in range(len(self.blocks_over)):
-            self.make_available(self.blocks_over[i])
-            destination = -self.blocks_over[i]
-            self.move(self.blocks_over[i], destination)
+            self.make_available(i+1)
 
 
     def control_stack_odd_even(self):
@@ -186,6 +185,9 @@ class Controller():
                     req.target[arm] = target[arm]
             #rospy.loginfo(req)
             self.move_robot(req)
+        self.state_updated = False
+        while not self.state_updated:
+            pass
 
     def move_arm(self):
         angles = self.right_limb.joint_angles()
