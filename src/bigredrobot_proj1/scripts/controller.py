@@ -3,15 +3,37 @@
 ## Template for controller node
 
 import rospy
+import baxter_interface
+
 from std_msgs.msg import String
 from bigredrobot_proj1.msg import *
 from bigredrobot_proj1.srv import *
+
+#Should probably go to robot_interface
+from geometry_msgs.msg import (
+    PoseStamped,
+    Pose,
+    Point,
+    Quaternion,
+)
+
+from std_msgs.msg import Header
+
+from baxter_core_msgs.srv import (
+    SolvePositionIK,
+    SolvePositionIKRequest,
+)
 
 class Controller():
     
     def __init__(self):
         rospy.init_node("controller", anonymous=True)
         self.command = None
+        #Baxter enable
+        baxter_interface.RobotEnable().enable()
+        #Baxter Init right arm
+        self.right_limb = baxter_interface.Limb('right')
+		
 
 
     def state_update(self, state):
@@ -165,6 +187,42 @@ class Controller():
             #rospy.loginfo(req)
             self.move_robot(req)
 
+    def move_arm(self):
+        angles = self.right_limb.joint_angles()
+        self.right_limb.move_to_joint_positions(angles)
+        self.right_limb.move_to_neutral()
+        #self.right_limb.move_to_joint_positions(angles)
+
+
+        #Development code --- not pretty at all sorry
+        ikreq = SolvePositionIKRequest()
+        pose = self.right_limb.endpoint_pose()
+        b = True
+        pos = pose.popitem()
+        orient = pose.popitem()
+        prev = pos[1]
+
+        loc = Point(0,0,0)
+
+        hdr = Header(stamp=rospy.Time.now(), frame_id='base')
+        poses = {
+            'right': PoseStamped(header=hdr,
+                pose=Pose(position=loc, orientation=orient[1]))}
+                
+        ikreq.pose_stamp.append(poses['right'])
+
+        #def ik_solve(limb, pos, orient):
+        resp = self.ik_solve(ikreq)
+        
+        if resp.isValid[0]:
+          rospy.loginfo("Nothin found here...")
+
+        limb_joints = dict(zip(resp.joints[0].name, resp.joints[0].position))
+       
+        self.right_limb.move_to_joint_positions(limb_joints)
+        
+
+
     def control(self):
         if self.command == "scatter":
             self.control_scatter()
@@ -177,6 +235,8 @@ class Controller():
                 self.control_stack_odd_even()
             else:
                 rospy.logwarn('odd_even only available in bimanual mode, try again')
+        elif self.command == "move_arm":
+			self.move_arm();
         else:
             rospy.logwarn('You suck at typing. invalid name, try again.')
         self.command = None
@@ -185,6 +245,10 @@ class Controller():
     def run(self):
         rospy.wait_for_service('move_robot')
         self.move_robot = rospy.ServiceProxy('move_robot', MoveRobot)
+
+        #IK Service
+        self.ik_solve = rospy.ServiceProxy("ExternalTools/right/PositionKinematicsNode/IKService", SolvePositionIK)
+        
         while not rospy.is_shutdown():                
             if self.command :
                 self.control()
