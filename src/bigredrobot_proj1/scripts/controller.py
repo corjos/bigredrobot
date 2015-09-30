@@ -20,12 +20,11 @@ from geometry_msgs.msg import (
     Quaternion,
 )
 
-from std_msgs.msg import Header
-
 from baxter_core_msgs.srv import (
     SolvePositionIK,
     SolvePositionIKRequest,
 )
+
 
 class Controller():
     
@@ -93,7 +92,7 @@ class Controller():
 
 
     def make_available(self, target):
-        rospy.logwarn('Make %i available, States: %s' %(target, str(self.blocks_over)))
+        rospy.loginfo('Make %i available, States: %s' %(target, str(self.blocks_over)))
         #Do the following if the target isn't available yet
         if not self.is_available(target):
             blockOnTop = self.blocks_over.index(target) + 1 #Correct for zero index
@@ -102,7 +101,7 @@ class Controller():
                 rospy.loginfo('%i is not available' %(blockOnTop))
                 self.make_available(blockOnTop)
             rospy.loginfo('Moving %i to %i' %(blockOnTop, -blockOnTop))
-            self.move_left(blockOnTop, -blockOnTop)
+            self.move(blockOnTop, -blockOnTop)
         else:
             rospy.loginfo('Block %i is available, States: %s' %(target, str(self.blocks_over)))
         
@@ -169,10 +168,10 @@ class Controller():
 
 
     def move(self, blocknum, target):
-        if blocknum % 2 == 1:
-            self.move_left(blocknum, target)
-        else:
-            self.move_right(blocknum, target)
+        #if blocknum % 2 == 1:
+        #    self.move_left(blocknum, target)
+        #else:
+        self.move_right(blocknum, target)
 
     def move_left(self, blocknum, target):
         self.bimanual_move(blocknum, target, None, None)
@@ -195,7 +194,7 @@ class Controller():
                 else:                
                     req.action[arm] = action
                     req.target[arm] = target[arm]
-            #rospy.loginfo(req)
+            rospy.loginfo(req)
             self.move_robot(req)
         self.state_updated = False
         while not self.state_updated:
