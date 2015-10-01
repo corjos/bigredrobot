@@ -39,12 +39,12 @@ class Controller():
 
         #self.right_limb = baxter_interface.Limb('right')
 		
+        
+        #self.right_limb = baxter_interface.Limb('right')
 
-        self.right_limb = baxter_interface.Limb('right')
 
-
-        self.right_gripper = baxter_interface.Gripper('right')
-        self.right_gripper.calibrate()
+        #self.right_gripper = baxter_interface.Gripper('right')
+        #self.right_gripper.calibrate()
         
 
     def state_update(self, state):
@@ -134,8 +134,8 @@ class Controller():
 
     def control_stack_odd_even(self):
         #For now, stack in any order, but create two separate odd/even stacks
-        top_left = -1 # Top block in left stack
-        top_right = -2
+        top_left = -2 # Top block in left stack, initialised to base block
+        top_right = -1
         if self.is_stacked_descending():
             for i in range(1, len(self.blocks_over) + 1):
                 top_left, top_right = self.split_stack(i, top_left, top_right)
@@ -150,7 +150,8 @@ class Controller():
     def split_stack(self, currentblock, top_left, top_right):
         # move a given block on top of block top_left if it is odd, or top right if it is even
         # return the topmost block in the left and right stacks
-        if currentblock % 2 == 1:
+        # left arm moves even numbered blocks
+        if currentblock % 2 == 0:
             self.move_left(currentblock, top_left)
             top_left = currentblock
         else:
@@ -158,20 +159,11 @@ class Controller():
             top_right = currentblock
         return top_left, top_right
 
-    
-    #I don't know if we need this anymore...
-    def get_base_block(self, blocknum):
-        currentBlock = blocknum
-        while currentBlock > 0:
-            currentBlock = self.blocks_over[currentBlock - 1]
-        return currentBlock
-
-
     def move(self, blocknum, target):
-        #if blocknum % 2 == 1:
-        #    self.move_left(blocknum, target)
-        #else:
-        self.move_right(blocknum, target)
+        if self.num_arms == 1 or blocknum % 2 == 1:
+            self.move_right(blocknum, target)
+        else:
+            self.move_left(blocknum, target)
 
     def move_left(self, blocknum, target):
         self.bimanual_move(blocknum, target, None, None)
@@ -183,8 +175,10 @@ class Controller():
     def bimanual_move(self, lblocknum, ltarget, rblocknum, rtarget):
         # Execute open->move_to->close->move_over sequence in both arms, simultaneously moving blocks lblocknum and rblocknum on top of ltarget and rtarget, respectively. When block and target values are both None the respective arm will be idle.
         actions = [MoveRobotRequest.ACTION_OPEN_GRIPPER, MoveRobotRequest.ACTION_MOVE_TO,
-                    MoveRobotRequest.ACTION_CLOSE_GRIPPER, MoveRobotRequest.ACTION_MOVE_OVER]
-        targets = [[0,0], [lblocknum, rblocknum], [0,0], [ltarget, rtarget]]
+                    MoveRobotRequest.ACTION_CLOSE_GRIPPER, MoveRobotRequest.ACTION_MOVE_OVER,
+                    MoveRobotRequest.ACTION_OPEN_GRIPPER]
+        lgrip, rgrip = ltarget, rtarget # if target is none ensure gripper does not actuate
+        targets = [[lgrip,rgrip], [lblocknum, rblocknum], [lgrip,rgrip], [ltarget, rtarget], [lgrip,rgrip]]
         for action, target in zip(actions,targets):
             req = MoveRobotRequest()
             for arm in [MoveRobotRequest.LEFT_ARM, MoveRobotRequest.RIGHT_ARM]:               

@@ -28,33 +28,35 @@ class RobotInterface:
     def __init__(self):
         rospy.init_node('robot_interface', anonymous=True)
         self.is_real_robot = not rospy.get_param('symbolic_only')
+        self.num_arms = rospy.get_param('num_arms')
         if self.is_real_robot:
             # initialise baxter
             rospy.logwarn('baxter is online')
             baxter_interface.RobotEnable().enable()
             self.right_limb = baxter_interface.Limb('right') 
             self.right_gripper = baxter_interface.Gripper('right')
-            self.right_gripper.calibrate()
+            #self.right_gripper.calibrate()
             self.right_gripper.open()
             self.right_gripper.set_holding_force(100)
 
-            self.left_limb = baxter_interface.Limb('left') 
-            self.left_gripper = baxter_interface.Gripper('left')
-            self.left_gripper.calibrate()
-            self.left_gripper.open()
-            self.left_gripper.set_holding_force(100)
+            if self.num_arms == 2:
+                self.left_limb = baxter_interface.Limb('left') 
+                self.left_gripper = baxter_interface.Gripper('left')
+                #self.left_gripper.calibrate()
+                self.left_gripper.open()
+                self.left_gripper.set_holding_force(100)
             
             self.TABLE_Z = -0.08
             self.BLOCK_HEIGHT = 0.045
 
-            self.ik_solve = rospy.ServiceProxy("ExternalTools/right/PositionKinematicsNode/IKService", SolvePositionIK)
+            self.ik_solve_right = rospy.ServiceProxy("ExternalTools/right/PositionKinematicsNode/IKService", SolvePositionIK)
+            self.ik_solve_left = rospy.ServiceProxy("ExternalTools/left/PositionKinematicsNode/IKService", SolvePositionIK)
 
 
     def init_state(self):
         self.num_blocks = rospy.get_param('num_blocks')
         num_blocks = self.num_blocks # We suck
         configuration = rospy.get_param('configuration')
-        self.num_arms = rospy.get_param('num_arms')
         if self.num_arms == 1:
             self.arms = [State.RIGHT_ARM] # If we are only using one arm. We are using right        
         elif self.num_arms == 2:
@@ -70,17 +72,17 @@ class RobotInterface:
         if configuration=='scattered':
             # Not implemented fully
             self.blocks_over = list(range(-num_blocks+1,1)) # e.g [-2, -1, 0]
-            self.gripper_at[State.LEFT_ARM] = -1 # Not technically correct TODO: sort out these conventions
+            self.gripper_at[State.LEFT_ARM] = -(num_blocks - (num_blocks%2)) 
             self.gripper_at[State.RIGHT_ARM] = num_blocks
         elif configuration=='stacked_ascending':
             self.blocks_over = list(range(num_blocks)) # e.g [0, 1, 2]
             self.blocks_over[0] = 0
-            self.gripper_at[State.LEFT_ARM] = -1 # Not technically correct TODO: sort out these conventions
+            self.gripper_at[State.LEFT_ARM] = -(num_blocks - (num_blocks%2)) 
             self.gripper_at[State.RIGHT_ARM] = num_blocks
         elif configuration=='stacked_descending':
             self.blocks_over = list(range(2,num_blocks+1)) # e.g [2, 3, 0]
             self.blocks_over.append(0)
-            self.gripper_at[State.LEFT_ARM] = -1 # Not technically correct TODO: sort out these conventions
+            self.gripper_at[State.LEFT_ARM] = -(num_blocks - (num_blocks%2)) 
             self.gripper_at[State.RIGHT_ARM] = 1
             self.gripper_closed[State.LEFT_ARM] = True   
             self.gripper_closed[State.RIGHT_ARM] = True  
@@ -96,9 +98,9 @@ class RobotInterface:
             self.block_coords = {i:[0, 0, 0] for i in range(-self.num_blocks,self.num_blocks+1)} # [x,y,z]
             for i in self.base_y:
                 if i % 2 == 1:
-                    self.base_y[i] = pos.y + 2*i*self.BLOCK_HEIGHT - (i+1)*self.BLOCK_HEIGHT
+                    self.base_y[i] = pos.y + 1.5*(2*i*self.BLOCK_HEIGHT - (i+1)*self.BLOCK_HEIGHT)
                 else:
-                    self.base_y[i] = pos.y - i*self.BLOCK_HEIGHT
+                    self.base_y[i] = pos.y - 1.5*i*self.BLOCK_HEIGHT
                 self.block_coords[i] = [self.base_x, self.base_y[i], self.base_z]
             rospy.logwarn(self.base_y)
             rospy.logwarn('base x = %f, base y[0] = %f' %(self.base_x, self.base_y[0]))
@@ -109,7 +111,6 @@ class RobotInterface:
                 self.block_coords[nextblock] = [self.base_x, self.base_y[0], nextz]
                 nextz = nextz - self.BLOCK_HEIGHT
                 nextblock = self.blocks_over[nextblock-1]
-            rospy.logwarn(self.block_coords)
             self.ORIENT = pose.popitem()[1]
             
 
@@ -118,8 +119,6 @@ class RobotInterface:
 
     # Callback function for move_robot server
     def handle_move_robot(self, req):    
-
-        # TODO: Cartestian coordinate update    
         for arm in self.arms:
             if req.action[arm]==req.ACTION_OPEN_GRIPPER:
                 if self.gripper_closed[arm]:
@@ -173,24 +172,56 @@ class RobotInterface:
             else:
                 self.left_gripper.close(block=True)
 
+    def get_gripper_coords(self, arm):
+        if arm == State.LEFT_ARM:
+            pose = self.left_limb.endpoint_pose()
+        else:
+            pose = self.right_limb.endpoint_pose()
+        pos = pose.popitem()[1]
+        return pos.x, pos.y, pos.z
+
+    def avoid_conflict(self, target, arm):
+            # Move other arm out of the way if conflicting
+            other_arm = (arm+1) % 2
+            if True: #target == self.gripper_at[other_arm]:
+                rospy.logwarn('avoid conflict, arm = %i, other_arm=%i, target=%i' %(arm, other_arm, target))
+                
+                #x0, y0, z0 = self.block_coords[self.gripper_at[other_arm]] 
+                ycoords = [coord[1] for coord in self.block_coords.values()]
+                if other_arm == State.LEFT_ARM:
+                    pose = self.left_limb.endpoint_pose()
+                    pos = pose.popitem()[1]
+                    x1, y1, z1 = pos.x, max(ycoords) + 3*self.BLOCK_HEIGHT, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT
+                else:
+                    pose = self.right_limb.endpoint_pose()
+                    pos = pose.popitem()[1]
+                    x1, y1, z1 = pos.x, min(ycoords) - 3*self.BLOCK_HEIGHT, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT          
+                self.move_safely(pos.x,pos.y,pos.z,x1,y1,z1,other_arm)
+
     def robot_move_to(self, target, arm):
         if self.is_real_robot: 
-            x0, y0, z0 = self.block_coords[self.gripper_at[arm]]       
+            rospy.logwarn('move to, arm = %i, target = %i' %(arm, target))
+            if self.num_arms==2:            
+                self.avoid_conflict(target,arm)
+            x0, y0, z0 = self.get_gripper_coords(arm) 
             x1, y1, z1 = self.block_coords[target]  
             self.move_safely(x0,y0,z0,x1,y1,z1,arm)
 
 
     def robot_move_over(self, target, arm):
         if self.is_real_robot: 
-            x0, y0, z0 = self.block_coords[self.gripper_at[arm]]       
+            rospy.logwarn('move over, arm = %i, target = %i' %(arm, target))
+            if self.num_arms==2:                        
+                self.avoid_conflict(target,arm)
+            x0, y0, z0 = self.get_gripper_coords(arm)      
             x1, y1, z1_ = self.block_coords[target]  
             z1 = z1_ + self.BLOCK_HEIGHT            
             self.move_safely(x0,y0,z0,x1,y1,z1,arm)
             self.block_coords[self.gripper_at[arm]] = [x1, y1, z1]
     
     def move_safely(self,x0,y0,z0,x1,y1,z1,arm):
-            self.move_robot(x0, y0, self.base_z + (self.num_blocks+2)*self.BLOCK_HEIGHT, arm)
-            self.move_robot(x1, y1, self.base_z + (self.num_blocks+2)*self.BLOCK_HEIGHT, arm)
+            self.move_robot(x0, y0, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT, arm)
+            self.move_robot(x1, y1, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT, arm)
             self.move_robot(x1, y1, z1, arm)
 
 
@@ -201,8 +232,11 @@ class RobotInterface:
             poses = {'right': PoseStamped(header=hdr, pose=Pose(position=loc, orientation=self.ORIENT))}
 
             ikreq.pose_stamp.append(poses['right'])
-
-            resp = self.ik_solve(ikreq)
+            
+            if arm == State.RIGHT_ARM:
+                resp = self.ik_solve_right(ikreq)
+            else:
+                resp = self.ik_solve_left(ikreq)
 
             if not resp.isValid[0]:
                 rospy.logwarn("No IK solution")
