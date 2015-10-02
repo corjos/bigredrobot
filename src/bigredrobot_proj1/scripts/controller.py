@@ -40,7 +40,6 @@ class Controller():
 
 
     def is_stacked_ascending(self):
-        #TODO: rewrite everything
         if self.blocks_over[0] > 0:
             return False
         for i in range(1,len(self.blocks_over)):
@@ -50,7 +49,6 @@ class Controller():
         
 
     def is_stacked_descending(self):
-        #TODO: rewrite everything
         if self.blocks_over[-1] > 0:
             return False
         for i in range(len(self.blocks_over)-1):
@@ -138,7 +136,7 @@ class Controller():
 
     def move_right(self, blocknum, target):
         self.bimanual_move(None, None, blocknum, target)
-        # TODO: check for action failure 
+
             
     def bimanual_move(self, lblocknum, ltarget, rblocknum, rtarget):
         # Execute open->move_to->close->move_over sequence in both arms, simultaneously moving blocks lblocknum and rblocknum on top of ltarget and rtarget, respectively. When block and target values are both None the respective arm will be idle.
@@ -160,6 +158,7 @@ class Controller():
             self.move_robot(req)
         self.state_updated = False
         while not self.state_updated:
+	    # Block until state is updated, as this controller requires most recent state from interface
             pass        
 
 

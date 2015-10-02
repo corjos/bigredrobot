@@ -67,10 +67,9 @@ class RobotInterface:
         self.gripper_at = [None]*2
         self.gripper_closed = [None]*2
         
-        # convention?: initialise right arm at top of stack, left arm over a
-        # negative odd-numbered block?
+        # convention: every block has a corresponding 'virtual' block reffered to by -blocknum
         if configuration=='scattered':
-            # Not implemented fully
+            # Symbolic only
             self.blocks_over = list(range(-num_blocks+1,1)) # e.g [-2, -1, 0]
             self.gripper_at[State.LEFT_ARM] = -(num_blocks - (num_blocks%2)) 
             self.gripper_at[State.RIGHT_ARM] = num_blocks
@@ -92,9 +91,9 @@ class RobotInterface:
             pose = self.right_limb.endpoint_pose()
             pos = pose.popitem()[1]
             rospy.logwarn(pos)
-            self.base_x = pos.x
-            self.base_y = {i:0 for i in range(-self.num_blocks,1)}
-            self.base_z = pos.z - self.num_blocks*self.BLOCK_HEIGHT
+            self.base_x = pos.x # All block stacks lie on the same x position
+            self.base_y = {i:0 for i in range(-self.num_blocks,1)} 
+            self.base_z = pos.z - self.num_blocks*self.BLOCK_HEIGHT # Find z corresponding to base block
             self.block_coords = {i:[0, 0, 0] for i in range(-self.num_blocks,self.num_blocks+1)} # [x,y,z]
             for i in self.base_y:
                 if i % 2 == 1:
@@ -150,13 +149,11 @@ class RobotInterface:
                     return False
             elif req.action[arm]==req.ACTION_IDLE:
                 pass # nothing to see here
-
-        # TODO: add joint motion constraints/checks
         return False
 
 
 # Real robot move functions.
-# Send commands to baxter and update cartesian block coords. 
+# Send commands to baxter 
 # Must be called before symbolic state update        
     def robot_open_gripper(self, arm):
         if self.is_real_robot:
@@ -181,16 +178,14 @@ class RobotInterface:
         return pos.x, pos.y, pos.z
 
     def avoid_conflict(self, target, arm):
-            # Move other arm out of the way if conflicting
             other_arm = (arm+1) % 2
-            if True: #target == self.gripper_at[other_arm]:
+            if True: # Move non-commanded arm to safe position at every action
                 rospy.logwarn('avoid conflict, arm = %i, other_arm=%i, target=%i' %(arm, other_arm, target))
-                
-                #x0, y0, z0 = self.block_coords[self.gripper_at[other_arm]] 
                 ycoords = [coord[1] for coord in self.block_coords.values()]
                 if other_arm == State.LEFT_ARM:
                     pose = self.left_limb.endpoint_pose()
                     pos = pose.popitem()[1]
+		    # Move to some point in the workspace very far from the center
                     x1, y1, z1 = pos.x, max(ycoords) + 3*self.BLOCK_HEIGHT, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT
                 else:
                     pose = self.right_limb.endpoint_pose()
@@ -220,12 +215,14 @@ class RobotInterface:
             self.block_coords[self.gripper_at[arm]] = [x1, y1, z1]
     
     def move_safely(self,x0,y0,z0,x1,y1,z1,arm):
+	    # Move safely between source and destination coords by moving vertically above maximum stack height first then moving horizontally, followed by a final vertical move to the destination z coord
             self.move_robot(x0, y0, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT, arm)
             self.move_robot(x1, y1, self.base_z + (self.num_blocks+1.5)*self.BLOCK_HEIGHT, arm)
             self.move_robot(x1, y1, z1, arm)
 
 
     def move_robot(self, x, y, z, arm):
+	    # Command arm to move to coordinates x,y,z
             loc = Point(float(x),float(y),float(z))
             hdr = Header(stamp=rospy.Time.now(), frame_id='base')
             ikreq = SolvePositionIKRequest()
@@ -255,7 +252,8 @@ class RobotInterface:
         self.srv = rospy.Service('move_robot', MoveRobot, self.handle_move_robot) 
     
     def run(self):
-        rate = rospy.Rate(1) # 1hz
+	rospy.logwarn("Ready to receive commands")
+        rate = rospy.Rate(1) # Update state 1hz
         while not rospy.is_shutdown():
             state = State()
             state.blocks_over = self.blocks_over
